@@ -1,3 +1,14 @@
+terraform {
+  required_version = ">= 1.8.4"
+  required_providers {
+    aws = ">= 5.51.1"
+  }
+}
+
+provider "aws" {
+  region = "us-west-2"
+}
+
 locals {
   endpoint_map = {
     for def in var.lambda_endpoint_definitions : "${var.app_name}_${def.path_part}" => {
@@ -8,27 +19,29 @@ locals {
   }
 
   method_map = {
-    for def in var.method_definitions : "${var.app_name}_${var.path_part}_${def.http_method}" => {
-      http_method = def.http_method
-      command     = def.command
-      timeout     = def.timeout
-      memory_size = def.memory_size
-    }
+    for def in flatten([for endpoint in var.lambda_endpoint_definitions : [
+      for method in endpoint.method_definitions : {
+        path_part  = endpoint.path_part
+        http_method = method.http_method
+        command     = method.command
+        timeout     = method.timeout
+        memory_size = method.memory_size
+      }
+    ]]) : "${var.app_name}_${def.path_part}_${def.http_method}" => def
   }
 
-  http_methods        = [for def in var.method_definitions : def.http_method]
+  http_methods        = [for def in flatten([for endpoint in var.lambda_endpoint_definitions : endpoint.method_definitions]) : def.http_method]
   http_methods_string = join(",", local.http_methods)
 }
 
-# ========== Miscellaneous Data ==========
-module "acs" {
-  source = "github.com/byu-oit/terraform-aws-acs-info?ref=v4.0.0"
+# ========== ECR Repository ==========
+resource "aws_ecr_repository" "ecr_repo" {
+  name = "${var.app_name}-repo"
 }
 
 # ========== Lambda Policies ==========
 resource "aws_iam_role" "lambda_role" {
-  name                 = var.app_name
-  permissions_boundary = module.acs.role_permissions_boundary.arn
+  name = "${var.app_name}-lambda-role"
   assume_role_policy = jsonencode({
     "Version" : "2012-10-17",
     "Statement" : [
@@ -80,6 +93,12 @@ resource "aws_api_gateway_rest_api" "api_gateway" {
 resource "aws_api_gateway_deployment" "api_gateway_deployment" {
   rest_api_id = aws_api_gateway_rest_api.api_gateway.id
   stage_name  = "${var.app_name}-stage"
+}
+
+resource "aws_api_gateway_stage" "api_gateway_stage" {
+  deployment_id = aws_api_gateway_deployment.api_gateway_deployment.id
+  rest_api_id   = aws_api_gateway_rest_api.api_gateway.id
+  stage_name    = "${var.app_name}-stage"
 }
 
 # ========== API Gateway ==========
@@ -177,8 +196,8 @@ resource "aws_route53_record" "api_gateway_subdomain_AAAA" {
 }
 
 resource "aws_api_gateway_base_path_mapping" "api_gateway_base_path_mapping" {
-  api_id      = aws_api_gateway_rest_api.api_gateway.id
-  stage_name  = aws_api_gateway_deployment.api_gateway_deployment.stage_name
+  api_id      = aws_api_gateway.id
+  stage_name  = aws_api_gateway_stage.api_gateway_stage.stage_name
   domain_name = aws_api_gateway_domain_name.api_gateway_domain_name.domain_name
 }
 
@@ -226,7 +245,7 @@ resource "aws_lambda_function" "lambda_function" {
   function_name = each.key
   role          = var.lambda_role_arn
   package_type  = "Image"
-  image_uri     = "${var.ecr_repo.repository_url}:${var.app_name}-${var.image_tag}"
+  image_uri     = "${aws_ecr_repository.ecr_repo.repository_url}:${var.app_name}-${var.image_tag}"
   timeout       = each.value.timeout
   memory_size   = each.value.memory_size
   image_config {

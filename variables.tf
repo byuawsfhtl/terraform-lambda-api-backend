@@ -23,14 +23,6 @@ variable "api_url" {
   description = "The custom url for your api. Ex: api.projectname.fhtl-dev.org"
 }
 
-variable "ecr_repo" {
-  type = object({
-    name           = string,
-    repository_url = string
-  })
-  description = "The ECR repository that contains the image for the lambda functions."
-}
-
 variable "image_tag" {
   type        = string
   description = "The image tag for the Docker image (the timestamp)."
@@ -76,16 +68,6 @@ variable "allowed_headers" {
   description = "The custom headers the endpoint should allow. Provided as a string with each header key separated by a comma."
 }
 
-variable "method_definitions" {
-  type = list(object({
-    http_method = string
-    command     = list(string)
-    timeout     = optional(number)
-    memory_size = optional(number)
-  }))
-  description = "The definitions for each method of the endpoint."
-}
-
 variable "api_gateway" {
   type = object({
     name             = string
@@ -109,16 +91,6 @@ variable "timeout" {
 variable "memory_size" {
   type        = number
   description = "The amount of memory, in MB, your Lambda Function is given. Valid values are from 128 to 10,240. Default is 128. 1,769 is equivalent to 1 vCPU."
-}
-
-variable "api_gateway" {
-  type = object({
-    name             = string
-    id               = string
-    root_resource_id = string
-    execution_arn    = string
-  })
-  description = "The API Gateway for the enpoints."
 }
 
 variable "api_resource_id" {
