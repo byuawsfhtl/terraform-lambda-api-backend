@@ -28,6 +28,11 @@ variable "image_tag" {
   description = "The image tag for the Docker image (the timestamp)."
 }
 
+variable "ecr_repo_url" {
+  description = "The URL of the ECR repository"
+  type        = string
+}
+
 variable "lambda_environment_variables" {
   type        = map(string)
   description = "The environment variables to set on the Lambda functions."
@@ -36,12 +41,13 @@ variable "lambda_environment_variables" {
 variable "lambda_endpoint_definitions" {
   type = list(object({
     path_part       = string
-    allowed_headers = optional(string)
+    allowed_headers = string
 
     method_definitions = list(object({
       http_method = string
-      command     = list(string)
-      timeout     = optional(number)
+      command     = optional(list(string))
+      timeout     = number
+      memory_size = number
     }))
   }))
   description = "The definitions for each lambda function."
@@ -58,39 +64,13 @@ variable "lambda_role_arn" {
   description = "The ARN of the Lambda Role to be attached to the Lambda function."
 }
 
-variable "path_part" {
-  type        = string
-  description = "The URL path to invoke the method."
-}
-
-variable "allowed_headers" {
-  type        = string
-  description = "The custom headers the endpoint should allow. Provided as a string with each header key separated by a comma."
-}
-
 variable "api_gateway" {
   type = object({
     name             = string
     id               = string
     root_resource_id = string
-    execution_arn    = string
   })
-  description = "The API Gateway for the enpoints."
-}
-
-variable "command" {
-  type        = list(string)
-  description = "The lambda handlers for each method of the endpoint. The syntax is file_name.function_name"
-}
-
-variable "timeout" {
-  type        = number
-  description = "Amount of time your Lambda Function has to run in seconds."
-}
-
-variable "memory_size" {
-  type        = number
-  description = "The amount of memory, in MB, your Lambda Function is given. Valid values are from 128 to 10,240. Default is 128. 1,769 is equivalent to 1 vCPU."
+  description = "The API Gateway for the endpoints."
 }
 
 variable "api_resource_id" {
