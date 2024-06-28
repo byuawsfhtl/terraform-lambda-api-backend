@@ -99,6 +99,21 @@ def delete_data():
     return jsonify({"message": "Data not found"}), 404
 ```
 
+For Flask apps, you need a requirements.txt that holds dependencies, and here is how this would look:
+
+```
+blinker==1.6.2
+click==8.1.3
+Flask==2.3.2
+gunicorn==22.0.0
+importlib-metadata==6.6.0
+itsdangerous==2.1.2
+Jinja2==3.1.4
+MarkupSafe==2.1.2
+Werkzeug==3.0.3
+zipp==3.15.0
+```
+
 It's also nice to have a `.dockerignore` file and here is an example for that as well:
 
 ```
