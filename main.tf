@@ -18,11 +18,11 @@ locals {
   method_map = {
     for def in flatten([for endpoint in var.lambda_endpoint_definitions : [
       for method in endpoint.method_definitions : {
-        path_part    = endpoint.path_part
-        http_method  = method.http_method
-        command      = method.command
-        timeout      = method.timeout
-        memory_size  = method.memory_size
+        path_part   = endpoint.path_part
+        http_method = method.http_method
+        command     = method.command
+        timeout     = method.timeout
+        memory_size = method.memory_size
       }
     ]]) : "${var.app_name}_${def.path_part}_${def.http_method}" => def
   }
@@ -81,11 +81,11 @@ resource "aws_api_gateway_integration_response" "api_options_integration_respons
 }
 
 resource "aws_api_gateway_method_response" "api_options_method_response" {
-  for_each      = local.endpoint_map
-  rest_api_id   = aws_api_gateway_rest_api.api_gateway.id
-  resource_id   = aws_api_gateway_resource.api_resource[each.key].id
-  http_method   = aws_api_gateway_method.api_options_method[each.key].http_method
-  status_code   = 200
+  for_each    = local.endpoint_map
+  rest_api_id = aws_api_gateway_rest_api.api_gateway.id
+  resource_id = aws_api_gateway_resource.api_resource[each.key].id
+  http_method = aws_api_gateway_method.api_options_method[each.key].http_method
+  status_code = 200
   response_models = {
     "application/json" = "Empty"
   }
