@@ -7,9 +7,9 @@ terraform {
 
 locals {
   endpoint_map = {
-    for def in var.lambda_endpoint_definitions : "${var.app_name}_${def.path_part}" => {
+    for def in var.lambda_endpoint_definitions : def.path_part => {
       path_part          = def.path_part
-      allowed_headers    = def.allowed_headers
+      allowed_headers    = join(",", def.allowed_headers)
       method_definitions = def.method_definitions
     }
   }
@@ -17,7 +17,7 @@ locals {
   method_map = {
     for def in flatten([for endpoint in var.lambda_endpoint_definitions : [
       for method in endpoint.method_definitions : {
-        path_part    = "${var.app_name}_${endpoint.path_part}"
+        path_part    = endpoint.path_part
         http_method  = method.http_method
         command      = method.command
         timeout      = method.timeout
@@ -188,10 +188,10 @@ resource "aws_route53_record" "api_gateway_cert_validation" {
 resource "aws_lambda_function" "lambda_function" {
   for_each = local.method_map
 
-  function_name = each.key
+  function_name = "${var.app_name}_${each.value.path_part}_${each.value.http_method}"
   role          = var.lambda_role_arn
   package_type  = "Image"
-  image_uri     = "${var.ecr_repo_url}:${var.app_name}-${var.image_tag}"
+  image_uri     = "${var.ecr_repo_url}:${var.image_tag}"
   timeout       = each.value.timeout
   memory_size   = each.value.memory_size
   environment {
@@ -238,8 +238,4 @@ resource "aws_cloudwatch_log_group" "LambdaFunctionLogGroup" {
 
   name              = "/aws/lambda/${aws_lambda_function.lambda_function[each.key].function_name}"
   retention_in_days = 7
-}
-
-output "api_gateway_execution_arn" {
-  value = aws_api_gateway_rest_api.api_gateway.execution_arn
 }
