@@ -26,7 +26,7 @@ module "api_gateway_example" {
   lambda_endpoint_definitions = [
     {
       path_part = "example-path"
-      allowed_headers = ["Authorization", ...(any other headers)]
+      allowed_headers = ["Authorization", Content-Type, ...(any other headers)]
 
       method_definitions = [
         {
