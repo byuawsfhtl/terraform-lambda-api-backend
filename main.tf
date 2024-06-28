@@ -5,6 +5,7 @@ terraform {
   }
 }
 
+# ==================== Locals ====================
 locals {
   endpoint_map = {
     for def in var.lambda_endpoint_definitions : def.path_part => {
@@ -30,25 +31,9 @@ locals {
   http_methods_string = join(",", local.http_methods)
 }
 
+# ==================== AWS API Gateway ====================
 resource "aws_api_gateway_rest_api" "api_gateway" {
   name = var.project_name
-}
-
-resource "aws_api_gateway_deployment" "api_gateway_deployment" {
-  rest_api_id = aws_api_gateway_rest_api.api_gateway.id
-  stage_name  = ""
-  depends_on  = [aws_api_gateway_method.api_method, aws_api_gateway_integration.api_integration]
-}
-
-resource "aws_api_gateway_stage" "api_gateway_stage" {
-  deployment_id = aws_api_gateway_deployment.api_gateway_deployment.id
-  rest_api_id   = aws_api_gateway_rest_api.api_gateway.id
-  stage_name    = "${var.app_name}-stage"
-
-  depends_on = [
-    aws_api_gateway_domain_name.api_gateway_domain_name,
-    aws_acm_certificate_validation.api_gateway_cert_validation
-  ]
 }
 
 resource "aws_api_gateway_resource" "api_resource" {
@@ -111,15 +96,59 @@ resource "aws_api_gateway_method_response" "api_options_method_response" {
   }
 }
 
-data "aws_route53_zone" "domain_zone" {
-  name = var.domain
-}
-
 resource "aws_api_gateway_domain_name" "api_gateway_domain_name" {
   depends_on = [aws_acm_certificate_validation.api_gateway_cert_validation]
 
   domain_name     = var.api_url
   certificate_arn = aws_acm_certificate.api_gateway_cert.arn
+}
+
+resource "aws_api_gateway_base_path_mapping" "api_gateway_base_path_mapping" {
+  api_id      = aws_api_gateway_rest_api.api_gateway.id
+  stage_name  = aws_api_gateway_stage.api_gateway_stage.stage_name
+  domain_name = aws_api_gateway_domain_name.api_gateway_domain_name.domain_name
+}
+
+resource "aws_api_gateway_method" "api_method" {
+  for_each = local.method_map
+
+  rest_api_id   = aws_api_gateway_rest_api.api_gateway.id
+  resource_id   = aws_api_gateway_resource.api_resource[each.value.path_part].id
+  http_method   = each.value.http_method
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_integration" "api_integration" {
+  for_each = local.method_map
+
+  rest_api_id             = aws_api_gateway_rest_api.api_gateway.id
+  resource_id             = aws_api_gateway_resource.api_resource[each.value.path_part].id
+  http_method             = aws_api_gateway_method.api_method[each.key].http_method
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = aws_lambda_function.lambda_function[each.key].invoke_arn
+}
+
+resource "aws_api_gateway_deployment" "api_gateway_deployment" {
+  rest_api_id = aws_api_gateway_rest_api.api_gateway.id
+  stage_name  = ""
+  depends_on  = [aws_api_gateway_method.api_method, aws_api_gateway_integration.api_integration]
+}
+
+resource "aws_api_gateway_stage" "api_gateway_stage" {
+  deployment_id = aws_api_gateway_deployment.api_gateway_deployment.id
+  rest_api_id   = aws_api_gateway_rest_api.api_gateway.id
+  stage_name    = "${var.app_name}-stage"
+
+  depends_on = [
+    aws_api_gateway_domain_name.api_gateway_domain_name,
+    aws_acm_certificate_validation.api_gateway_cert_validation
+  ]
+}
+
+# ==================== AWS Route 53 ====================
+data "aws_route53_zone" "domain_zone" {
+  name = var.domain
 }
 
 resource "aws_route53_record" "api_gateway_subdomain_A" {
@@ -146,12 +175,7 @@ resource "aws_route53_record" "api_gateway_subdomain_AAAA" {
   }
 }
 
-resource "aws_api_gateway_base_path_mapping" "api_gateway_base_path_mapping" {
-  api_id      = aws_api_gateway_rest_api.api_gateway.id
-  stage_name  = aws_api_gateway_stage.api_gateway_stage.stage_name
-  domain_name = aws_api_gateway_domain_name.api_gateway_domain_name.domain_name
-}
-
+# ==================== AWS ACM Certificates ====================
 provider "aws" {
   alias  = "virginia"
   region = "us-east-1"
@@ -161,12 +185,6 @@ resource "aws_acm_certificate" "api_gateway_cert" {
   provider          = aws.virginia
   domain_name       = var.api_url
   validation_method = "DNS"
-}
-
-resource "aws_acm_certificate_validation" "api_gateway_cert_validation" {
-  provider                = aws.virginia
-  certificate_arn         = aws_acm_certificate.api_gateway_cert.arn
-  validation_record_fqdns = [for record in aws_route53_record.api_gateway_cert_validation : record.fqdn]
 }
 
 resource "aws_route53_record" "api_gateway_cert_validation" {
@@ -185,10 +203,17 @@ resource "aws_route53_record" "api_gateway_cert_validation" {
   ttl     = 60
 }
 
+resource "aws_acm_certificate_validation" "api_gateway_cert_validation" {
+  provider                = aws.virginia
+  certificate_arn         = aws_acm_certificate.api_gateway_cert.arn
+  validation_record_fqdns = [for record in aws_route53_record.api_gateway_cert_validation : record.fqdn]
+}
+
+# ==================== AWS Lambda ====================
 resource "aws_lambda_function" "lambda_function" {
   for_each = local.method_map
 
-  function_name = "${var.app_name}_${each.value.path_part}_${each.value.http_method}"
+  function_name = each.key
   role          = var.lambda_role_arn
   package_type  = "Image"
   image_uri     = "${var.ecr_repo_url}:${var.image_tag}"
@@ -213,26 +238,7 @@ resource "aws_lambda_permission" "lambda_permission" {
   source_arn    = "${aws_api_gateway_rest_api.api_gateway.execution_arn}/*"
 }
 
-resource "aws_api_gateway_method" "api_method" {
-  for_each = local.method_map
-
-  rest_api_id   = aws_api_gateway_rest_api.api_gateway.id
-  resource_id   = aws_api_gateway_resource.api_resource[each.value.path_part].id
-  http_method   = each.value.http_method
-  authorization = "NONE"
-}
-
-resource "aws_api_gateway_integration" "api_integration" {
-  for_each = local.method_map
-
-  rest_api_id             = aws_api_gateway_rest_api.api_gateway.id
-  resource_id             = aws_api_gateway_resource.api_resource[each.value.path_part].id
-  http_method             = aws_api_gateway_method.api_method[each.key].http_method
-  integration_http_method = "POST"
-  type                    = "AWS_PROXY"
-  uri                     = aws_lambda_function.lambda_function[each.key].invoke_arn
-}
-
+# ==================== AWS Cloudwatch ====================
 resource "aws_cloudwatch_log_group" "LambdaFunctionLogGroup" {
   for_each = local.method_map
 

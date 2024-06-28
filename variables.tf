@@ -63,17 +63,3 @@ variable "lambda_role_arn" {
   type        = string
   description = "The ARN of the Lambda Role to be attached to the Lambda function."
 }
-
-variable "api_gateway" {
-  type = object({
-    name             = string
-    id               = string
-    root_resource_id = string
-  })
-  description = "The API Gateway for the endpoints."
-}
-
-variable "api_resource_id" {
-  type        = string
-  description = "The ID for the API Resource for this endpoint."
-}
