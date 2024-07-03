@@ -23,6 +23,12 @@ variable "api_url" {
   description = "The custom url for your api. Ex: api.projectname.fhtl-dev.org"
 }
 
+variable "api_gateway_integration_type" {
+  description = "The integration type for API Gateway"
+  type        = string
+  default     = "AWS_PROXY"
+}
+
 variable "image_tag" {
   type        = string
   description = "The image tag for the Docker image (the timestamp)."
