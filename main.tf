@@ -125,7 +125,7 @@ resource "aws_api_gateway_integration" "api_integration" {
   resource_id             = aws_api_gateway_resource.api_resource[each.value.path_part].id
   http_method             = aws_api_gateway_method.api_method[each.key].http_method
   integration_http_method = "POST"
-  type                    = "AWS_PROXY"
+  type                    = var.api_gateway_integration_type
   uri                     = aws_lambda_function.lambda_function[each.key].invoke_arn
 }
 
