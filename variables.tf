@@ -36,6 +36,7 @@ variable "ecr_repo_url" {
 variable "lambda_environment_variables" {
   type        = map(string)
   description = "The environment variables to set on the Lambda functions."
+  default     = {}
 }
 
 variable "lambda_endpoint_definitions" {
