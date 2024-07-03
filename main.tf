@@ -129,6 +129,44 @@ resource "aws_api_gateway_integration" "api_integration" {
   uri                     = aws_lambda_function.lambda_function[each.key].invoke_arn
 }
 
+resource "aws_api_gateway_method_response" "api_method_response" {
+  for_each = local.method_map
+
+  rest_api_id = aws_api_gateway_rest_api.api_gateway.id
+  resource_id = aws_api_gateway_resource.api_resource[each.value.path_part].id
+  http_method = aws_api_gateway_method.api_method[each.key].http_method
+  status_code = 200
+
+  response_models = {
+    "application/json" = "Empty"
+  }
+
+  response_parameters = {
+    "method.response.header.Content-Type" = true
+  }
+}
+
+resource "aws_api_gateway_integration_response" "api_integration_response" {
+  for_each = local.method_map
+
+  rest_api_id = aws_api_gateway_rest_api.api_gateway.id
+  resource_id = aws_api_gateway_resource.api_resource[each.value.path_part].id
+  http_method = aws_api_gateway_method.api_method[each.key].http_method
+  status_code = "200"
+
+  response_parameters = {
+    "method.response.header.Content-Type" = "integration.response.header.Content-Type"
+  }
+
+  response_templates = {
+    "application/json" = ""
+  }
+
+  depends_on = [
+    aws_api_gateway_integration.api_integration
+  ]
+}
+
 resource "aws_api_gateway_deployment" "api_gateway_deployment" {
   rest_api_id = aws_api_gateway_rest_api.api_gateway.id
   stage_name  = ""
