@@ -144,6 +144,10 @@ resource "aws_api_gateway_method_response" "api_method_response" {
   response_parameters = {
     "method.response.header.Content-Type" = true
   }
+
+  depends_on = [
+    aws_lambda_function.lambda_function
+  ]
 }
 
 resource "aws_api_gateway_integration_response" "api_integration_response" {
@@ -163,6 +167,7 @@ resource "aws_api_gateway_integration_response" "api_integration_response" {
   }
 
   depends_on = [
+    aws_lambda_function.lambda_function,
     aws_api_gateway_integration.api_integration
   ]
 }
